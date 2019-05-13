@@ -1,0 +1,2 @@
+wget http://www.mimuw.edu.pl/~ciebie/cityscapes.tgz
+tar -xzf cityscapes.tgz
