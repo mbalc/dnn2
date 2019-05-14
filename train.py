@@ -33,21 +33,28 @@ writer = SummaryWriter()
 
 
 print("({:.3f}s) Preparing data...".format(time.time() - executionStart))
-train_size, valid_size, train_loader, valid_loaders = load_datasets()
+train_size, valid_size, train_loader, valid_loaders, result_to_image = load_datasets()
 print("({:.3f}s) Preparing model...".format(time.time() - executionStart))
 net, device = initFCN()
 # net, device = loadMyModel()
 
-print("({:.3f}s) Beginning training session...".format(time.time() - executionStart))
+def output_to_result(output):
+    return torch.argmax(output, dim=1)
 
 def score(output, target):
-    out_render = torch.argmax(output, dim=1)
+    out_render = output_to_result(output)
 
     grad = out_render - target
     points = torch.nonzero(grad).size(0)
     max_points = grad.flatten().size(0)
 
     return 100 * (max_points - points) / max_points
+
+def write_comparison_image(title, data, output, target, iteration):
+    computed = result_to_image(output_to_result(output))
+    expected = result_to_image(target)
+    grid = torchvision.utils.make_grid([data[0], computed[0], expected[0]])
+    writer.add_image(title, grid, iteration)
 
 def train():
     net.train()
@@ -71,11 +78,15 @@ def train():
         iteration = (batch_count * epoch) + batch_id
         iter_score = score(out, target)
 
-        writer.add_scalar('train_loss', loss.item(), iteration)
-        writer.add_scalar('train_score', iter_score, iteration)
+
         print('(E{} {:.3f}s T)\t[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tScore:  {:.3f}%'.format(
             epoch + 1, time.time() - executionStart, batch_id * len(data), train_size, # minor bug - last log for 100% has wrong image count
             100. * batch_id / batch_count, loss.item(), iter_score))
+
+        write_comparison_image('train_images', data, out, target, iteration)
+
+        writer.add_scalar('train_loss', loss.item(), iteration)
+        writer.add_scalar('train_score', iter_score, iteration)
 
 def test():
     net.eval()
@@ -96,6 +107,9 @@ def test():
                 scores.append(s)
 
                 iteration = epoch * batch_count + batch_id
+
+                write_comparison_image('test_images', data, output, target, iteration)
+
                 writer.add_scalar('test_loss', l, iteration)
                 writer.add_scalar('test_score', s, iteration)
 
@@ -112,11 +126,14 @@ def test():
     print('\nTest set: Average loss: {:.4f}, Score: ({:.2f}%)\n'.format(
         avg_loss, avg_score))
             
+print("({:.3f}s) Beginning training session...".format(time.time() - executionStart))
 
 for epoch in range(EPOCH_COUNT):
     train()
     test()
     saveMyModel(net, '-epoch-' + str(epoch))
+
+writer.add_graph(net, data, iteration)
 
 saveMyModel(net, '')
 

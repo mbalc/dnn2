@@ -69,8 +69,10 @@ class CityscapesDataset(torchdata.Dataset):
             if (len(self.pixel_values) >= CLASS_COUNT): break ## we only loop in case we don't find all the classes on the first image
 
         self.color_map = dict()
+        self.class_map = dict()
         for idx, class_code in enumerate(self.pixel_values):
             self.color_map[class_code] = idx
+            self.class_map[idx] = class_code
 
     def img_from_path(self, path):
         img = Image.open(path)
@@ -84,10 +86,25 @@ class CityscapesDataset(torchdata.Dataset):
         return self.to_tensor(img)
 
     def pixels_to_class_codes(self, out):
-        return ((out[0] * 255 * 256 * 256) + (out[1] * 255 * 256) + (out[2] * 255)).clone().long()
+        out = out * 255
+        return (256 * (256 * out[0] + out[1]) + out[2]).clone().long()
 
     def class_code_to_class(self, class_code):
         return self.color_map[class_code]
+
+    def result_to_image(self, img_batch):
+        def remap_class_codes(class_id):
+            return self.class_map[class_id]
+        
+        codes = img_batch.clone().cpu()
+        codes.apply_(remap_class_codes)
+
+        r = ((codes / (256 * 256)) % 256).clone().cuda()
+        g = ((codes / 256) % 256).clone().cuda()
+        b = (codes % 256).clone().cuda()
+
+        image = torch.stack([r, g, b], dim=-3) #before heightxwidth
+        return image.float() / 255
 
     def split_input_image(self, image):
         (img, out) = torch.split(image, INPUT_IMG_SIZE, dim=2)
@@ -139,7 +156,7 @@ def load_datasets():
     train_size = len(train_sampler)
     valid_size = len(valid_sampler) * len(valid_datasets)
 
-    return train_size, valid_size, train_loader, valid_loaders
+    return train_size, valid_size, train_loader, valid_loaders, train_dataset.result_to_image
 
     
     
