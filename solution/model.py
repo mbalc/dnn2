@@ -65,10 +65,11 @@ class FCN(nn.Module):
             upscalers.append(nn.ConvTranspose2d(2 * out_chann, out_chann, KERNEL_SIZE + 1, padding=PADDING, stride=2)) # TODO validate if this makes sense, parameterize
 
             if (in_chann) == RGB_CHANNEL_COUNT: in_chann = CLASS_COUNT
+            else: in_chann = out_chann # we want the very last conv to give CLASS_COUNT channels, otherwise same as out_chann
             rightconvs.append(nn.Sequential(
                 nn.Conv2d(2 * out_chann, out_chann, KERNEL_SIZE, padding=PADDING), # channels from left part of U-net + from previous layer
                 nn.ReLU(),
-                nn.Conv2d(out_chann, out_chann, KERNEL_SIZE, padding=PADDING),
+                nn.Conv2d(out_chann, in_chann, KERNEL_SIZE, padding=PADDING),
                 nn.ReLU(),
             ))
 
