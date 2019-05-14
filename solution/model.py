@@ -5,7 +5,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import numpy as np
+
 from solution.data import load_datasets, INPUT_IMG_SIZE
+
+torch.manual_seed(42)
+torch.backends.cudnn.deterministic = True
+np.random.seed(42)
+random.seed(42)
 
 MODEL_DEST_PATH = os.path.join(os.getcwd(), 'model')
 

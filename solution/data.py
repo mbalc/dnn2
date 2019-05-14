@@ -3,6 +3,7 @@ import random
 from PIL import Image
 
 import torch
+import numpy as np
 
 import glob
 
@@ -11,6 +12,10 @@ import torchvision
 from torchvision import datasets, transforms
 from torch.utils import data as torchdata
 
+torch.manual_seed(42)
+torch.backends.cudnn.deterministic = True
+np.random.seed(42)
+random.seed(42)
 
 DATASET_PATH = os.path.join(os.getcwd(), 'cityscapes')
 COLOR_CLASS_MAP_PATH = os.path.join(os.getcwd(), 'colors')
@@ -92,7 +97,6 @@ def load_datasets():
     image_dataset = CityscapesDataset()
     ids = list(range(len(image_dataset)))
 
-    random.seed(42)
     random.shuffle(ids)
 
     train_sampler = torchdata.sampler.SubsetRandomSampler(ids[VALIDATION_SET_SIZE:])

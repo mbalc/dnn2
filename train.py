@@ -1,12 +1,20 @@
 import os
+import random
 import time
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import numpy as np
+
 from solution.model import saveMyModel, initFCN
 from solution.data import load_datasets, INPUT_IMG_SIZE
+
+torch.manual_seed(42)
+torch.backends.cudnn.deterministic = True
+np.random.seed(42)
+random.seed(42)
 
 EPOCH_COUNT = 2
 
