@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from solution.model import saveMyModel, initCNN
+from solution.model import saveMyModel, initFCN
 from solution.data import load_datasets, INPUT_IMG_SIZE
 
 EPOCH_COUNT = 2
@@ -19,17 +19,20 @@ if TESTING_RATE < 1:
 
 executionStart = time.time()
 
-image_datasets, dataloaders, dataset_sizes, class_names = load_datasets()
-net, device = initCNN(class_names)
+train_sampler, valid_sampler, train_loader, valid_loader = load_datasets()
+net, device = initFCN()
+
+def score(output, target):
+    return 0 # TODO
 
 def train():
     net.train()
     crit = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.94)
+    optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 
-    batchCount = len(dataloaders['Training'])
+    batch_count = len(train_loader)
 
-    for batchId, (data, target) in enumerate(dataloaders['Training']):
+    for batch_id, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
 
         optimizer.zero_grad()
@@ -40,13 +43,10 @@ def train():
 
         optimizer.step()
 
-        if batchId % int(batchCount / LOGGING_PERIOD) == 0 or batchId + 1 == batchCount:
-            print('({:.3f}s)\tTrain Epoch: {}\t[{}/{} ({:.0f}%)]\t\tLoss: {:.6f}'.format(
-                time.time() - executionStart, epoch + 1, batchId * len(data), len(image_datasets['Training']), # minor bug - last log for 100% has wrong image count
-                100. * batchId / batchCount, loss.item())) # TODO reformat logging
+        print('(E{} {:.3f}s)\t[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tScore:  {:.3f}'.format(
+            epoch + 1, time.time() - executionStart, batch_id * len(data), len(train_sampler), # minor bug - last log for 100% has wrong image count
+            100. * batch_id / batch_count, loss.item(), score(out, target)))
 
-        if batchId > 0 and batchId % int(batchCount / TESTING_RATE) == 0:
-            test()
 
 def test():
     net.eval()
@@ -70,6 +70,5 @@ def test():
 
 for epoch in range(EPOCH_COUNT):
     train()
-    test()
     
 saveMyModel(net)

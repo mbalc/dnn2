@@ -38,45 +38,56 @@ class FCN(nn.Module):
 
         CHANNELS = [None, 64, 128, 256, 512]
         KERNEL_SIZE = 3
-        PADDING = (KERNEL_SIZE - 1) / 2
+        PADDING = (KERNEL_SIZE - 1) // 2
         
-        self.leftconvs = nn.ModuleList([])
-        self.maxpools = nn.ModuleList([])
-        self.rightconvs = nn.ModuleList([])
-        self.upscalers = nn.ModuleList([])
+        leftconvs = []
+        maxpools = []
+        upscalers = []
+        rightconvs = []
         for in_chann, out_chann in zip(CHANNELS[:-1], CHANNELS[1:]):
             if (in_chann) == None: in_chann = RGB_CHANNEL_COUNT
-            self.leftconvs.append(nn.Sequential(
+            leftconvs.append(nn.Sequential(
                 nn.Conv2d(in_chann, out_chann, KERNEL_SIZE, padding=PADDING),
                 nn.ReLU(),
                 nn.Conv2d(out_chann, out_chann, KERNEL_SIZE, padding=PADDING),
                 nn.ReLU(),
             ))
+
+            maxpools.append(nn.MaxPool2d(2, stride = 2)) # 4 pixels -> 1 pixel
+
+            upscalers.append(nn.ConvTranspose2d(2 * out_chann, out_chann, KERNEL_SIZE + 1, padding=PADDING, stride=2)) # TODO validate if this makes sense, parameterize
+
             if (in_chann) == RGB_CHANNEL_COUNT: in_chann = CLASS_COUNT
-            self.rightconvs.append(nn.Sequential(
+            rightconvs.append(nn.Sequential(
                 nn.Conv2d(2 * out_chann, out_chann, KERNEL_SIZE, padding=PADDING), # channels from left part of U-net + from previous layer
                 nn.ReLU(),
-                nn.Conv2d(out_chann, in_chann, KERNEL_SIZE, padding=PADDING),
+                nn.Conv2d(out_chann, out_chann, KERNEL_SIZE, padding=PADDING),
                 nn.ReLU(),
             ))
 
-            self.maxpools.append(nn.MaxPool2d(2, stride = 2)) # 4 pixels -> 1 pixel
-            self.upscalers.append(nn.ConvTranspose2d(in_chann, in_chann, KERNEL_SIZE, padding=PADDING))
-
         intermed_chann_count = CHANNELS[-1]
+
+        self.leftconvs = nn.ModuleList(leftconvs)
+        self.maxpools = nn.ModuleList(maxpools)
+
         self.intermediate = nn.Sequential(
             nn.Conv2d(intermed_chann_count, 2 * intermed_chann_count, KERNEL_SIZE, padding=PADDING),
             nn.ReLU(),
             nn.Conv2d(2 * intermed_chann_count, 2 * intermed_chann_count, KERNEL_SIZE, padding=PADDING),
             nn.ReLU(),
         )
+
+        upscalers.reverse()
+        self.upscalers = nn.ModuleList(upscalers)
+        rightconvs.reverse()
+        self.rightconvs = nn.ModuleList(rightconvs)
     
     def forward(self, imgs): # imgs.shape = (BATCH_SIZE, CHANNEL_COUNT, HEIGHT, WIDTH)
         output_buffer = [] # storage for data to crop up and provide to the right side of unet
 
         for (conv, pool) in zip(self.leftconvs, self.maxpools):
             imgs = conv(imgs)
-            output_buffer.insert(imgs)
+            output_buffer.append(imgs)
             imgs = pool(imgs)
 
         imgs = self.intermediate(imgs)

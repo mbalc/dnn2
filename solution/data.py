@@ -16,7 +16,7 @@ DATASET_PATH = os.path.join(os.getcwd(), 'cityscapes')
 COLOR_CLASS_MAP_PATH = os.path.join(os.getcwd(), 'colors')
 ROOT_SUFFIXES = ["Training", "Test"]
 
-BATCH_SIZE = 92
+BATCH_SIZE = 16
 NUM_WORKERS = 32
 
 CLASS_COUNT = 30
@@ -67,19 +67,22 @@ class CityscapesDataset(torchdata.Dataset):
         return t
 
     def pixels_to_class_codes(self, out):
-        return ((out[0] * 255 * 256 * 256) + (out[1] * 255 * 256) + (out[2] * 255)).clone().int()
+        return ((out[0] * 255 * 256 * 256) + (out[1] * 255 * 256) + (out[2] * 255)).clone().long()
+
+    def class_code_to_class(self, class_code):
+        return self.color_map[class_code]
 
     def split_input_image(self, image):
         return torch.split(image, INPUT_IMG_SIZE, dim=2)
 
     def __getitem__(self, idx):
         path = self.all_image_paths[idx]
-        img = self.img_from_path(self)
+        img = self.img_from_path(path)
         (img, out) = self.split_input_image(img)
-        out = pixels_to_class_codes(out)
+        out = self.pixels_to_class_codes(out)
+        out.apply_(self.class_code_to_class)
 
-        img.to('cuda')
-        return self.images[idx]
+        return (img, out)
 
     def __len__(self):
         return len(self.all_image_paths)
@@ -98,7 +101,7 @@ def load_datasets():
     train_loader = torch.utils.data.DataLoader(image_dataset, batch_size=BATCH_SIZE, sampler=train_sampler, num_workers=NUM_WORKERS)
     valid_loader = torch.utils.data.DataLoader(image_dataset, batch_size=BATCH_SIZE, sampler=valid_sampler, num_workers=NUM_WORKERS)
 
-    return train_loader, valid_loader
+    return train_sampler, valid_sampler, train_loader, valid_loader
 
     
     
