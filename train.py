@@ -5,6 +5,8 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
+import torchvision
 
 import numpy as np
 
@@ -26,6 +28,7 @@ if TESTING_RATE < 1:
 
 
 executionStart = time.time()
+writer = SummaryWriter()
 
 
 train_size, valid_size, train_loader, valid_loaders = load_datasets()
@@ -59,10 +62,15 @@ def train():
 
         optimizer.step()
 
-        print('(E{} {:.3f}s)\t[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tScore:  {:.3f}'.format(
-            epoch + 1, time.time() - executionStart, batch_id * len(data), train_size, # minor bug - last log for 100% has wrong image count
-            100. * batch_id / batch_count, loss.item(), score(out, target)))
 
+        iteration = (batch_count * epoch) + batch_id
+        iter_score = score(out, target)
+
+        writer.add_scalar('train_loss', loss.item(), iteration)
+        writer.add_scalar('train_score', iter_score, iteration)
+        print('(E{} {:.3f}s T)\t[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tScore:  {:.3f}%'.format(
+            epoch + 1, time.time() - executionStart, batch_id * len(data), train_size, # minor bug - last log for 100% has wrong image count
+            100. * batch_id / batch_count, loss.item(), iter_score))
 
 def test():
     net.eval()
@@ -90,3 +98,4 @@ for epoch in range(EPOCH_COUNT):
 
 saveMyModel(net, '')
 
+writer.close()
