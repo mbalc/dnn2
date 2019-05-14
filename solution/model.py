@@ -15,6 +15,7 @@ np.random.seed(42)
 random.seed(42)
 
 ## adjustables
+BASE_CHANNEL_COUNT = 72
 DEPTH = 3
 
 MODEL_DEST_FILENAME = 'model'
@@ -51,7 +52,8 @@ class FCN(nn.Module):
     def __init__(self):
         super(FCN, self).__init__()
 
-        CHANNELS = [None, 64, 128, 256, 512]
+        CHANNELS = [None]
+        CHANNELS.extend([BASE_CHANNEL_COUNT * (2 ** n) for n in range(DEPTH)])
         KERNEL_SIZE = 3
         PADDING = (KERNEL_SIZE - 1) // 2
         
