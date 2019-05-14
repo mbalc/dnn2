@@ -31,7 +31,13 @@ train_sampler, valid_sampler, train_loader, valid_loader = load_datasets()
 net, device = initFCN()
 
 def score(output, target):
-    return 0 # TODO
+    out_render = torch.argmax(output, dim=1)
+
+    grad = out_render - target
+    points = torch.nonzero(grad).size(0)
+    max_points = grad.flatten().size(0)
+
+    return 100 * (max_points - points) / max_points
 
 def train():
     net.train()
