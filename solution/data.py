@@ -2,6 +2,8 @@ import os
 import random
 from PIL import Image
 
+import itertools
+
 import torch
 import numpy as np
 
@@ -29,10 +31,16 @@ VALIDATION_SET_SIZE = 500
 
 INPUT_IMG_SIZE = 256 # images are scaled to a square with this edge length (preventing a case where a image has different dimensions)
 
+TRANSFORMATIONS = [
+    transforms.functional.hflip,
+] # future TODO - allow transformations that apply only to the input, i.e. contrast/saturation/brightness
+
     
 
 class CityscapesDataset(torchdata.Dataset):
-    def __init__(self):
+    def __init__(self, translist = transforms.Compose([])):
+        self.transforms = translist
+
         self.load_images()
         self.load_color_mapper()
         # self.preprocess_images()
@@ -41,6 +49,8 @@ class CityscapesDataset(torchdata.Dataset):
         """Load images to memory"""
         print('Loading image paths...')
         self.to_tensor = transforms.ToTensor()
+        self.to_pil = transforms.ToPILImage()
+
         self.all_image_paths = glob.glob(DATASET_PATH + '/*.png') 
 
     def load_color_mapper(self):
@@ -71,6 +81,11 @@ class CityscapesDataset(torchdata.Dataset):
         img.close()
         return t
 
+    def transform(self, img):
+        img = self.to_pil(img)
+        img = self.transforms(img)
+        return self.to_tensor(img)
+
     def pixels_to_class_codes(self, out):
         return ((out[0] * 255 * 256 * 256) + (out[1] * 255 * 256) + (out[2] * 255)).clone().long()
 
@@ -78,7 +93,11 @@ class CityscapesDataset(torchdata.Dataset):
         return self.color_map[class_code]
 
     def split_input_image(self, image):
-        return torch.split(image, INPUT_IMG_SIZE, dim=2)
+        (img, out) = torch.split(image, INPUT_IMG_SIZE, dim=2)
+
+        img = self.transform(img)
+        out = self.transform(out)
+        return (img, out)
 
     def __getitem__(self, idx):
         path = self.all_image_paths[idx]
@@ -94,18 +113,36 @@ class CityscapesDataset(torchdata.Dataset):
 
 
 def load_datasets():
-    image_dataset = CityscapesDataset()
-    ids = list(range(len(image_dataset)))
+    randomized_transformations = transforms.RandomOrder([
+        transforms.RandomApply([tr])
+        for tr in TRANSFORMATIONS
+    ])
+
+
+    all_transform_combinations = []
+    for n in range(len(TRANSFORMATIONS) + 1): # (from 0 to len)
+        for comb in itertools.permutations(TRANSFORMATIONS, n):
+            all_transform_combinations.append(transforms.Compose(comb))
+
+    train_dataset = CityscapesDataset(randomized_transformations)
+    valid_datasets = [CityscapesDataset(translist) for translist in all_transform_combinations]
+    ids = list(range(len(train_dataset)))
 
     random.shuffle(ids)
 
     train_sampler = torchdata.sampler.SubsetRandomSampler(ids[VALIDATION_SET_SIZE:])
     valid_sampler = torchdata.sampler.SubsetRandomSampler(ids[:VALIDATION_SET_SIZE])
     
-    train_loader = torch.utils.data.DataLoader(image_dataset, batch_size=BATCH_SIZE, sampler=train_sampler, num_workers=NUM_WORKERS)
-    valid_loader = torch.utils.data.DataLoader(image_dataset, batch_size=BATCH_SIZE, sampler=valid_sampler, num_workers=NUM_WORKERS)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=train_sampler, num_workers=NUM_WORKERS)
+    valid_loaders = [
+        torch.utils.data.DataLoader(dset, batch_size=BATCH_SIZE, sampler=valid_sampler, num_workers=NUM_WORKERS)
+        for dset in valid_datasets
+    ]
 
-    return train_sampler, valid_sampler, train_loader, valid_loader
+    train_size = len(train_sampler)
+    valid_size = len(valid_sampler) * len(valid_datasets)
+
+    return train_size, valid_size, train_loader, valid_loaders
 
     
     

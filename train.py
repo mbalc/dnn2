@@ -27,7 +27,8 @@ if TESTING_RATE < 1:
 
 executionStart = time.time()
 
-train_sampler, valid_sampler, train_loader, valid_loader = load_datasets()
+
+train_size, valid_size, train_loader, valid_loaders = load_datasets()
 net, device = initFCN()
 
 def score(output, target):
@@ -58,7 +59,7 @@ def train():
         optimizer.step()
 
         print('(E{} {:.3f}s)\t[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tScore:  {:.3f}'.format(
-            epoch + 1, time.time() - executionStart, batch_id * len(data), len(train_sampler), # minor bug - last log for 100% has wrong image count
+            epoch + 1, time.time() - executionStart, batch_id * len(data), train_size, # minor bug - last log for 100% has wrong image count
             100. * batch_id / batch_count, loss.item(), score(out, target)))
 
 
