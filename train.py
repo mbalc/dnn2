@@ -20,6 +20,7 @@ np.random.seed(42)
 random.seed(42)
 
 EPOCH_COUNT = 2
+IMG_WRITER_PERIOD = 20
 
 TESTING_RATE = 1 # we execute testing sessions this many times during an epoch
 LOGGING_PERIOD = 50 # there will be this many logs per train epoch
@@ -51,6 +52,7 @@ def score(output, target):
     return 100 * (max_points - points) / max_points
 
 def write_comparison_image(title, data, output, target, iteration):
+    if iteration % IMG_WRITER_PERIOD > 0: return
     computed = result_to_image(output_to_result(output))
     expected = result_to_image(target)
     grid = torchvision.utils.make_grid([data[0], computed[0], expected[0]])
@@ -59,7 +61,7 @@ def write_comparison_image(title, data, output, target, iteration):
 def train():
     net.train()
     crit = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+    # optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.94)
 
     batch_count = len(train_loader)
 
@@ -95,6 +97,7 @@ def test():
     correct = 0
     crit = nn.CrossEntropyLoss()
     batch_count = len(valid_loaders[0]) * len(valid_loaders)
+    lastdata = None
     with torch.no_grad():
         for loader_id, dataloader in enumerate(valid_loaders):
             for batch_id, (data, target) in enumerate(dataloader):
@@ -117,11 +120,14 @@ def test():
                     epoch + 1, time.time() - executionStart, batch_id * len(data), valid_size, # minor bug - last log for 100% has wrong image count
                     100. * batch_id / batch_count, l, s))
 
+                lastdata = data
+
     avg_score = statistics.mean(scores)
     avg_loss = statistics.mean(losses)
 
     writer.add_scalar('test_total_loss', avg_loss, epoch)
     writer.add_scalar('test_total_score', avg_score, epoch)
+    writer.add_graph(net, lastdata, epoch)
 
     print('\nTest set: Average loss: {:.4f}, Score: ({:.2f}%)\n'.format(
         avg_loss, avg_score))
@@ -133,7 +139,6 @@ for epoch in range(EPOCH_COUNT):
     test()
     saveMyModel(net, '-epoch-' + str(epoch))
 
-writer.add_graph(net, data, iteration)
 
 saveMyModel(net, '')
 

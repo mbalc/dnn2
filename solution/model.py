@@ -15,11 +15,11 @@ np.random.seed(42)
 random.seed(42)
 
 ## adjustables
-BASE_CHANNEL_COUNT = 72
-DEPTH = 3
+BASE_CHANNEL_COUNT = 75
+DEPTH = 2
 
 MODEL_DEST_FILENAME = 'model'
-MODEL_DEST_LOADFILENAME = 'model'
+MODEL_DEST_LOADFILENAME = 'model-epoch-0'
 MODEL_DEST_PATH = os.getcwd()
 ## adjustables
 
