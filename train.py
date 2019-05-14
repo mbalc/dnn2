@@ -1,6 +1,7 @@
 import os
 import random
 import time
+import statistics
 
 import torch
 import torch.nn as nn
@@ -31,9 +32,13 @@ executionStart = time.time()
 writer = SummaryWriter()
 
 
+print("({:.3f}s) Preparing data...".format(time.time() - executionStart))
 train_size, valid_size, train_loader, valid_loaders = load_datasets()
+print("({:.3f}s) Preparing model...".format(time.time() - executionStart))
 net, device = initFCN()
 # net, device = loadMyModel()
+
+print("({:.3f}s) Beginning training session...".format(time.time() - executionStart))
 
 def score(output, target):
     out_render = torch.argmax(output, dim=1)
@@ -74,26 +79,43 @@ def train():
 
 def test():
     net.eval()
-    test_loss = 0
+    losses = []
+    scores = []
     correct = 0
     crit = nn.CrossEntropyLoss()
+    batch_count = len(valid_loaders[0]) * len(valid_loaders)
     with torch.no_grad():
-        for data, target in dataloaders['Test']:
-            data, target = data.to(device), target.to(device)
-            output = net(data)
-            test_loss += crit(output, target).item()
-            pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
+        for loader_id, dataloader in enumerate(valid_loaders):
+            for batch_id, (data, target) in enumerate(dataloader):
+                batch_id += loader_id * len(valid_loaders[0])
+                data, target = data.to(device), target.to(device)
+                output = net(data)
+                l = crit(output, target).item()
+                s = score(output, target)
+                losses.append(l)
+                scores.append(s)
 
-    test_loss /= len(image_datasets['Test'])
+                iteration = epoch * batch_count + batch_id
+                writer.add_scalar('test_loss', l, iteration)
+                writer.add_scalar('test_score', s, iteration)
 
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
-        test_loss, correct, len(image_datasets['Test']),
-        100. * correct / len(image_datasets['Test'])))
+                print('(E{} {:.3f}s V)\t[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tScore:  {:.3f}%'.format(
+                    epoch + 1, time.time() - executionStart, batch_id * len(data), valid_size, # minor bug - last log for 100% has wrong image count
+                    100. * batch_id / batch_count, l, s))
+
+    avg_score = statistics.mean(scores)
+    avg_loss = statistics.mean(losses)
+
+    writer.add_scalar('test_total_loss', avg_loss, epoch)
+    writer.add_scalar('test_total_score', avg_score, epoch)
+
+    print('\nTest set: Average loss: {:.4f}, Score: ({:.2f}%)\n'.format(
+        avg_loss, avg_score))
             
 
 for epoch in range(EPOCH_COUNT):
     train()
+    test()
     saveMyModel(net, '-epoch-' + str(epoch))
 
 saveMyModel(net, '')

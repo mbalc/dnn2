@@ -47,7 +47,6 @@ class CityscapesDataset(torchdata.Dataset):
 
     def load_images(self):
         """Load images to memory"""
-        print('Loading image paths...')
         self.to_tensor = transforms.ToTensor()
         self.to_pil = transforms.ToPILImage()
 
@@ -55,12 +54,10 @@ class CityscapesDataset(torchdata.Dataset):
 
     def load_color_mapper(self):
         """Either generate new color map from images, or load from previously generated save"""
-        print('Loading color mapper...')
         self.generate_color_class_map()
 
     # def preprocess_images():
     #     """Assign expected outputs their classes per pixel, according to color map"""
-    #     print('Preprocessing images...')
 
     def generate_color_class_map(self):
         self.pixel_values = set()
