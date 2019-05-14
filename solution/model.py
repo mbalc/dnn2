@@ -14,9 +14,16 @@ torch.backends.cudnn.deterministic = True
 np.random.seed(42)
 random.seed(42)
 
-MODEL_DEST_PATH = os.path.join(os.getcwd(), 'model')
-
+## adjustables
 DEPTH = 3
+
+MODEL_DEST_FILENAME = 'model'
+MODEL_DEST_LOADFILENAME = 'model'
+MODEL_DEST_PATH = os.getcwd()
+## adjustables
+
+def model_path_with_suffix(suffix):
+    return os.path.join(MODEL_DEST_PATH, MODEL_DEST_FILENAME + suffix)
 
 RGB_CHANNEL_COUNT = 3
 CLASS_COUNT = 30
@@ -28,14 +35,15 @@ def initFCN():
     net = FCN().to(device)
     return net, device
 
-def saveMyModel(net):
-    print('Saving the model serialization to', MODEL_DEST_PATH)
+def saveMyModel(net, suffix):
+    path = model_path_with_suffix(suffix)
+    print('Saving the model serialization to', path)
 
-    torch.save(net.state_dict(), MODEL_DEST_PATH)
+    torch.save(net.state_dict(), path)
 
-def loadMyModel(class_names):
-    model, device = initCNN(class_names)
-    model.load_state_dict(torch.load(MODEL_DEST_PATH))
+def loadMyModel():
+    model, device = initFCN()
+    model.load_state_dict(torch.load(os.path.join(MODEL_DEST_PATH, MODEL_DEST_LOADFILENAME)))
     model.eval()
     return model, device
 

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 import numpy as np
 
-from solution.model import saveMyModel, initFCN
+from solution.model import loadMyModel, saveMyModel, initFCN
 from solution.data import load_datasets, INPUT_IMG_SIZE
 
 torch.manual_seed(42)
@@ -30,6 +30,7 @@ executionStart = time.time()
 
 train_size, valid_size, train_loader, valid_loaders = load_datasets()
 net, device = initFCN()
+# net, device = loadMyModel()
 
 def score(output, target):
     out_render = torch.argmax(output, dim=1)
@@ -85,5 +86,7 @@ def test():
 
 for epoch in range(EPOCH_COUNT):
     train()
-    
-saveMyModel(net)
+    saveMyModel(net, '-epoch-' + str(epoch))
+
+saveMyModel(net, '')
+
