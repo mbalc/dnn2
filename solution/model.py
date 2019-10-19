@@ -15,8 +15,8 @@ np.random.seed(42)
 random.seed(42)
 
 ## adjustables
-BASE_CHANNEL_COUNT = 75
-DEPTH = 2
+BASE_CHANNEL_COUNT = 40
+DEPTH = 3
 
 MODEL_DEST_FILENAME = 'model'
 MODEL_DEST_LOADFILENAME = 'model-epoch-0'
@@ -25,6 +25,7 @@ MODEL_DEST_PATH = os.getcwd()
 
 def model_path_with_suffix(suffix):
     return os.path.join(MODEL_DEST_PATH, MODEL_DEST_FILENAME + suffix)
+
 
 RGB_CHANNEL_COUNT = 3
 CLASS_COUNT = 30

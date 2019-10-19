@@ -31,15 +31,21 @@ VALIDATION_SET_SIZE = 500
 
 INPUT_IMG_SIZE = 256 # images are scaled to a square with this edge length (preventing a case where a image has different dimensions)
 
-TRANSFORMATIONS = [
-    transforms.functional.hflip,
-] # future TODO - allow transformations that apply only to the input, i.e. contrast/saturation/brightness
-
+# class CityscapesSampler(torchdata.Sampler):
+#     def __init__(self):
+#         # self.results = map(Image.open, all_image_paths)
     
+#     def __iter__(self):
+#         return self.results
+    
+#     def __len__(self):
+#         return length(self.results)
+
 
 class CityscapesDataset(torchdata.Dataset):
-    def __init__(self, translist = transforms.Compose([])):
+    def __init__(self, translist = transforms.Compose([]), randomly=False):
         self.transforms = translist
+        self.randomly = randomly
 
         self.load_images()
         self.load_color_mapper()
@@ -74,6 +80,14 @@ class CityscapesDataset(torchdata.Dataset):
             self.color_map[class_code] = idx
             self.class_map[idx] = class_code
 
+    # def load_color_class_map(self):
+    #     return null
+    #     # todo
+
+    # def save_color_class_map(self):
+    #     return null
+    #     # todo
+    
     def img_from_path(self, path):
         img = Image.open(path)
         t = self.to_tensor(img)
@@ -109,8 +123,9 @@ class CityscapesDataset(torchdata.Dataset):
     def split_input_image(self, image):
         (img, out) = torch.split(image, INPUT_IMG_SIZE, dim=2)
 
-        img = self.transform(img)
-        out = self.transform(out)
+        if ((not self.randomly) or random.randint(0, 1) == 0):
+            img = self.transform(img)
+            out = self.transform(out)
         return (img, out)
 
     def __getitem__(self, idx):
@@ -121,27 +136,21 @@ class CityscapesDataset(torchdata.Dataset):
         out.apply_(self.class_code_to_class)
 
         return (img, out)
+        # img_batch = iter(self.input_provider)[idx]
+        # return torch.tensor(img_batch)
 
     def __len__(self):
         return len(self.all_image_paths)
 
 
 def load_datasets():
-    randomized_transformations = transforms.RandomOrder([
-        transforms.RandomApply([tr])
-        for tr in TRANSFORMATIONS
-    ])
+    train_dataset = CityscapesDataset(transforms.functional.hflip, randomly=True)
+    valid_datasets = [
+        CityscapesDataset(),
+        CityscapesDataset(transforms.functional.hflip, randomly=False)
+    ]
 
-
-    all_transform_combinations = []
-    for n in range(len(TRANSFORMATIONS) + 1): # (from 0 to len)
-        for comb in itertools.permutations(TRANSFORMATIONS, n):
-            all_transform_combinations.append(transforms.Compose(comb))
-
-    train_dataset = CityscapesDataset(randomized_transformations)
-    valid_datasets = [CityscapesDataset(translist) for translist in all_transform_combinations]
     ids = list(range(len(train_dataset)))
-
     random.shuffle(ids)
 
     train_sampler = torchdata.sampler.SubsetRandomSampler(ids[VALIDATION_SET_SIZE:])
@@ -158,6 +167,15 @@ def load_datasets():
 
     return train_size, valid_size, train_loader, valid_loaders, train_dataset.result_to_image
 
-    
-    
 
+# def load_datasets():
+#     transformations = transforms.Compose([
+#         transforms.Resize((INPUT_IMG_SIZE, INPUT_IMG_SIZE)),
+#         transforms.ToTensor()
+#     ])
+    
+    
+#     dataset_sizes = {x: len(image_datasets[x]) for x in ROOT_SUFFIXES}
+#     class_names = image_datasets['Training'].classes
+
+#     return image_datasets, dataloaders, dataset_sizes, class_names

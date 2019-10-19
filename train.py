@@ -1,6 +1,9 @@
+import time
+executionStart = time.time()
+print("({:.3f}s) Importing stuff...".format(time.time() - executionStart))
+
 import os
 import random
-import time
 import statistics
 
 import torch
@@ -19,8 +22,10 @@ torch.backends.cudnn.deterministic = True
 np.random.seed(42)
 random.seed(42)
 
-EPOCH_COUNT = 2
-IMG_WRITER_PERIOD = 20
+EPOCH_COUNT = 12
+IMG_WRITER_PERIOD = 4
+
+
 
 TESTING_RATE = 1 # we execute testing sessions this many times during an epoch
 LOGGING_PERIOD = 50 # there will be this many logs per train epoch
@@ -29,8 +34,7 @@ if TESTING_RATE < 1:
     raise Exception('Testing rate has to be positive')
 
 
-executionStart = time.time()
-writer = SummaryWriter()
+writer = SummaryWriter('runs/hyper-deep')
 
 
 print("({:.3f}s) Preparing data...".format(time.time() - executionStart))
@@ -38,6 +42,8 @@ train_size, valid_size, train_loader, valid_loaders, result_to_image = load_data
 print("({:.3f}s) Preparing model...".format(time.time() - executionStart))
 net, device = initFCN()
 # net, device = loadMyModel()
+
+optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 
 def output_to_result(output):
     return torch.argmax(output, dim=1)
@@ -52,7 +58,6 @@ def score(output, target):
     return 100 * (max_points - points) / max_points
 
 def write_comparison_image(title, data, output, target, iteration):
-    if iteration % IMG_WRITER_PERIOD > 0: return
     computed = result_to_image(output_to_result(output))
     expected = result_to_image(target)
     grid = torchvision.utils.make_grid([data[0], computed[0], expected[0]])
@@ -77,9 +82,13 @@ def train():
         optimizer.step()
 
 
+        # if batch_id > 0 and batch_id % int(batch_count / TESTING_RATE) == 0:
+        #     test()
+
         iteration = (batch_count * epoch) + batch_id
         iter_score = score(out, target)
 
+        lrate = optimizer.param_groups[0]['lr']
 
         print('(E{} {:.3f}s T)\t[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tScore:  {:.3f}%'.format(
             epoch + 1, time.time() - executionStart, batch_id * len(data), train_size, # minor bug - last log for 100% has wrong image count
@@ -127,6 +136,7 @@ def test():
 
     writer.add_scalar('test_total_loss', avg_loss, epoch)
     writer.add_scalar('test_total_score', avg_score, epoch)
+    
     writer.add_graph(net, lastdata, epoch)
 
     print('\nTest set: Average loss: {:.4f}, Score: ({:.2f}%)\n'.format(
